@@ -426,9 +426,6 @@ This project is part of the camera service infrastructure.
 - Ensure JSON-RPC handler catches and logs all exceptions without masking persistent failures.
 
 ## Testing
-- Provide `test_client.py` with full coverage:
-  - Unit tests for each JSON-RPC method (including invalid inputs).
-  - Integration test for camera-status notifications.
 - Add CI pipeline step to run tests automatically.
 
 ## Configuration & Deployment
