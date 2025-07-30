@@ -32,8 +32,8 @@ A Python service that provides a WebSocket endpoint with JSON-RPC 2.0 protocol s
 2. **Navigate to the project directory:**
    ```bash
    cd /opt/webcam-env
-   mkdir -p skeleton-server
-   cd skeleton-server
+   mkdir -p webcam_ip
+   cd webcam_ip
    ```
 
 3. **Install Python dependencies:**
@@ -259,16 +259,41 @@ The server implements standard JSON-RPC 2.0 error codes:
 ## Project Structure
 
 ```
-skeleton-server/
-├── server.py            # Enhanced server with camera monitoring
-├── test_client.py       # Enhanced test client with camera tests
-├── start_server.sh      # Start/stop script
-├── requirements.txt     # Python dependencies
-├── websocket-jsonrpc.service  # Systemd service file
-├── install.sh          # Installation script
-├── README.md           # This documentation
-└── logs/               # Log directory (created automatically)
-    └── server.log      # Server log file
+webcam-service/
+├── webcam_ip/                    # Main package
+│   ├── __init__.py
+│   ├── __main__.py              # Entry point: python -m webcam_ip
+│   ├── config.py                # Configuration management
+│   ├── server/
+│   │   ├── __init__.py
+│   │   ├── websocket_server.py  # WebSocket connection handling
+│   │   ├── jsonrpc_handler.py   # JSON-RPC request/response logic
+│   │   └── methods.py           # RPC method implementations
+│   ├── camera/
+│   │   ├── __init__.py
+│   │   ├── monitor.py           # Camera monitoring logic
+│   │   ├── detector.py          # Camera capability detection
+│   │   └── models.py            # CameraInfo and related models
+│   └── utils/
+│       ├── __init__.py
+│       ├── logging.py           # Logging configuration
+│       └── signals.py           # Signal handling
+├── tests/
+│   ├── __init__.py
+│   ├── test_camera_monitor.py
+│   ├── test_jsonrpc.py
+│   └── conftest.py              # pytest configuration
+├── config/
+│   ├── config.yaml              # Default configuration
+│   └── logging.yaml             # Logging configuration
+├── scripts/
+│   ├── install.sh
+│   └── start_server.sh
+├── systemd/
+│   └── webcam-service.service
+├── setup.py
+├── requirements.txt
+└── README.md
 ```
 
 ## Architecture
@@ -418,7 +443,7 @@ This project is part of the camera service infrastructure.
 - Improve shutdown responsiveness in `CameraMonitor`:
   - Replace `time.sleep` polling with an event or condition variable to ensure prompt thread exit.
 - Move capability detection off the main thread:
-  - Delegate `v4l2-ctl` calls to a thread‐ or process‐pool to avoid blocking monitoring loop.
+  - Delegate `v4l2-ctl` calls to a thread- or process-pool to avoid blocking the monitoring loop.
 
 ## API Validation & Error Handling
 - Add parameter schema validation for all JSON-RPC methods (e.g. using `pydantic` or manual checks).
@@ -426,27 +451,28 @@ This project is part of the camera service infrastructure.
 - Ensure JSON-RPC handler catches and logs all exceptions without masking persistent failures.
 
 ## Testing
+- Provide `test_client.py` with full coverage:
+  - Unit tests for each JSON-RPC method (including invalid inputs).
+  - Integration test for camera-status notifications.
+- Expand existing pytest suite:
+  - Add `test_signals.py` to exercise `SignalHandler` and `GracefulShutdown`.
+  - Add `test_client.py` to the ordered list in `run_all_validation.py`.
 - Add CI pipeline step to run tests automatically.
 
 ## Configuration & Deployment
-- Support external configuration file (e.g. `config.json`) in addition to environment variables.
+- **Config directory**: document and version the YAML/JSON files under `config/`:
+  - Define schema for `config/config.yaml` (or `config.json`): server host/port, camera poll interval, logging settings.
+  - Add a `03.Configuration.md` in `docs/` describing:
+    - All environment variables (names, defaults, purpose).
+    - How they map to entries in `config/config.yaml`.
+    - How to override via env vars or a custom file.
 - Handle log-directory permission errors gracefully (fallback to console only).
-- Add systemd service file and startup script to repository.
-
-## Packaging & Code Quality
-- Remove or consolidate redundant `__init__.py` imports to avoid circular dependencies.
-- Refine module structure to minimize relative imports and improve clarity.
-- Lint and format codebase (e.g. `flake8`, `black`).
-
-## Documentation
-- Update README to include new snapshot/recording API methods and example usage.
-- Document configuration options and deployment steps in a dedicated `docs/` folder.
-
-## Device Enumeration
-- Extend device discovery beyond `/dev/video0-9`:
-  - Automatically detect all V4L2 devices (`v4l2-ctl --list-devices`).
-  - Ignore non-camera video devices.
-
-## Logging & Observability
-- Leverage `StructuredLogger` consistently across modules.
-- Expose server health and metrics via a JSON-RPC or HTTP endpoint (e.g. Prometheus).
+- Add systemd unit file under `systemd/` and a startup script under `scripts/`, then document in `04.Deployment.md`.
+- Provide example commands to:
+  ```bash
+  # install deps
+  pip install -r requirements.txt
+  # run tests
+  python3 run_all_validation.py
+  # start service
+  python3 -m webcam_ip.websocket_server
