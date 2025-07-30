@@ -441,7 +441,8 @@ This project is part of the camera service infrastructure.
     - [ ] `stop_recording`: Stop the current recording operation.
     - [ ] `schedule_snapshots`: Capture periodic snapshots as scheduled.
     - [ ] `schedule_recording`: Start/stop recording based on scheduled times.
-- [ ] Integrate with `ffmpeg` or GStreamer (via subprocess) for snapshot and recording.
+- [ ] Integrate with `GStreamer` (via subprocess) for snapshot and recording.
+- [ ] Revise installation docs and dependences from `GStreamer` package.
 - [ ] Store resulting files in the configured media output directory (e.g., `/opt/media/`).
 - [ ] Generate and store a metadata `.json` file for each snapshot/recording (timestamp, resolution, FPS, etc.).
 
