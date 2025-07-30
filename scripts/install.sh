@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installation script for WebSocket JSON-RPC Server
+# Installation script for WebSocket JSON-RPC Server with Camera Monitoring
 
 set -e
 
@@ -69,6 +69,65 @@ check_prerequisites() {
     fi
     
     print_status "pip is available"
+}
+
+# Function to install system dependencies
+install_system_dependencies() {
+    print_title "Installing System Dependencies"
+    
+    # Update package list
+    print_status "Updating package list..."
+    apt-get update
+    
+    # Install v4l-utils for camera capability detection
+    print_status "Installing v4l-utils..."
+    apt-get install -y v4l-utils
+    
+    # Verify v4l2-ctl is available
+    if command -v v4l2-ctl > /dev/null 2>&1; then
+        print_status "v4l2-ctl installed successfully"
+        print_status "v4l2-ctl version: $(v4l2-ctl --version | head -n1)"
+    else
+        print_error "v4l2-ctl installation failed"
+        exit 1
+    fi
+    
+    # Install other useful camera tools
+    print_status "Installing additional camera tools..."
+    apt-get install -y uvcdynctrl guvcview || print_warning "Some additional tools may not be available"
+    
+    print_status "System dependencies installed successfully"
+}
+
+# Function to check camera permissions
+setup_camera_permissions() {
+    print_title "Setting Up Camera Permissions"
+    
+    # Add www-data user to video group for camera access
+    usermod -a -G video www-data
+    print_status "Added www-data user to video group"
+    
+    # Check if any video devices exist
+    if ls /dev/video* > /dev/null 2>&1; then
+        print_status "Video devices found:"
+        ls -la /dev/video* | while read line; do
+            print_status "  $line"
+        done
+        
+        # Test v4l2-ctl access
+        for device in /dev/video*; do
+            if [ -c "$device" ]; then
+                if sudo -u www-data v4l2-ctl --device="$device" --list-formats > /dev/null 2>&1; then
+                    print_status "www-data can access $device"
+                else
+                    print_warning "www-data cannot access $device"
+                fi
+            fi
+        done
+    else
+        print_warning "No video devices found - this is normal if no cameras are connected"
+        print_status "The server will still start and monitor for camera connections"
+    fi
 }
 
 # Function to create project structure
@@ -154,105 +213,24 @@ make_scripts_executable() {
     done
 }
 
-# Function to run initial tests
-run_initial_tests() {
-    print_title "Running Initial Tests"
+# Function to test camera functionality
+test_camera_functionality() {
+    print_title "Testing Camera Functionality"
     
-    print_status "Starting server in background for testing..."
-    
-    # Start server in background
-    sudo -u www-data "$VENV_PATH/bin/python3" "$SERVER_DIR/server.py" &
-    local server_pid=$!
-    
-    # Wait a moment for server to start
-    sleep 3
-    
-    # Check if server is still running
-    if ! kill -0 $server_pid 2>/dev/null; then
-        print_error "Server failed to start"
-        return 1
-    fi
-    
-    print_status "Server started (PID: $server_pid)"
-    
-    # Run simple test
-    if sudo -u www-data "$VENV_PATH/bin/python3" "$SERVER_DIR/test_client.py" --simple; then
-        print_status "Initial test passed!"
+    # Test v4l2-ctl as www-data user
+    print_status "Testing v4l2-ctl access..."
+    if sudo -u www-data v4l2-ctl --list-devices > /dev/null 2>&1; then
+        print_status "v4l2-ctl works for www-data user"
     else
-        print_error "Initial test failed"
+        print_warning "v4l2-ctl may not work properly for www-data user"
     fi
     
-    # Stop the server
-    print_status "Stopping test server..."
-    kill -TERM $server_pid
-    wait $server_pid 2>/dev/null || true
-    
-    print_status "Test server stopped"
-}
-
-# Function to show completion message
-show_completion_message() {
-    print_title "Installation Complete"
-    
-    echo -e "${GREEN}WebSocket JSON-RPC Server has been installed successfully!${NC}"
-    echo ""
-    echo "Next steps:"
-    echo "  1. Start the server:"
-    echo "     sudo systemctl start $SERVICE_NAME"
-    echo ""
-    echo "  2. Check server status:"
-    echo "     sudo systemctl status $SERVICE_NAME"
-    echo ""
-    echo "  3. Run tests:"
-    echo "     cd $SERVER_DIR"
-    echo "     sudo -u www-data $VENV_PATH/bin/python3 test_client.py"
-    echo ""
-    echo "  4. Use the start script:"
-    echo "     sudo $SERVER_DIR/start_server.sh start"
-    echo ""
-    echo "Server will be available at: ws://localhost:8002/ws"
-    echo "Logs location: $VENV_PATH/logs/server.log"
-    echo ""
-    echo "For more information, see: $SERVER_DIR/README.md"
-}
-
-# Function to cleanup on error
-cleanup_on_error() {
-    print_error "Installation failed. Cleaning up..."
-    
-    # Stop and disable service if it was created
-    if systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1; then
-        systemctl disable "$SERVICE_NAME" >/dev/null 2>&1 || true
-    fi
-    
-    if [ -f "/etc/systemd/system/$SERVICE_NAME.service" ]; then
-        rm -f "/etc/systemd/system/$SERVICE_NAME.service"
-        systemctl daemon-reload
-    fi
-    
-    print_error "Cleanup complete"
-    exit 1
-}
-
-# Main installation function
-main() {
-    print_title "WebSocket JSON-RPC Server Installation"
-    
-    # Set up error handling
-    trap cleanup_on_error ERR
-    
-    # Run installation steps
-    check_root
-    check_prerequisites
-    create_project_structure
-    install_dependencies
-    make_scripts_executable
-    install_systemd_service
-    run_initial_tests
-    show_completion_message
-    
-    print_status "Installation completed successfully!"
-}
-
-# Run main function
-main "$@"
+    # List available cameras
+    print_status "Scanning for cameras..."
+    if ls /dev/video* > /dev/null 2>&1; then
+        for device in /dev/video*; do
+            if [ -c "$device" ]; then
+                print_status "Found camera device: $device"
+                
+                # Try to get device info
+                if sudo -u www-data v4l2-ctl --device="$device" --info > /

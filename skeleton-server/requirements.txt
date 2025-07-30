@@ -8,10 +8,17 @@ jsonrpcserver>=5.0.9
 # High-performance event loop
 uvloop>=0.17.0
 
+# Camera monitoring dependencies
+# Note: v4l-utils package must be installed system-wide for v4l2-ctl command
+# Ubuntu/Debian: sudo apt-get install v4l-utils
+# CentOS/RHEL: sudo yum install v4l-utils
+
 # Additional dependencies for enhanced functionality
 # JSON handling (included in Python standard library, but pinning for consistency)
 # logging (included in Python standard library)
 # asyncio (included in Python standard library)
+# threading (included in Python standard library)
+# subprocess (included in Python standard library)
 
 # Development and testing dependencies (optional, uncomment if needed)
 # pytest>=7.4.0
@@ -19,3 +26,6 @@ uvloop>=0.17.0
 # black>=23.7.0
 # flake8>=6.0.0
 # mypy>=1.5.0
+
+# Optional: For more advanced USB device monitoring (alternative to polling)
+# pyudev>=0.24.0
