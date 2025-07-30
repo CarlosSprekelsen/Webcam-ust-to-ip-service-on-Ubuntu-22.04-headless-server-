@@ -55,13 +55,16 @@ def main():
     
     # Define test order and descriptions
     tests = [
-        ("validate_config.py", "Configuration Validation"),
-        ("test_imports.py", "Import Tests"),
-        ("test_jsonrpc.py", "JSON-RPC Handler Tests"),
-        ("test_camera_models.py", "Camera Models Tests"),
-        ("test_logging.py", "Logging System Tests"),
-        ("test_integration.py", "Full Integration Tests"),
+        ("validate_config.py",   "Configuration Validation"),
+        ("test_imports.py",      "Import Tests"),
+        ("test_jsonrpc.py",      "JSON-RPC Handler Tests"),
+        ("test_camera_models.py","Camera Models Tests"),
+        ("test_logging.py",      "Logging System Tests"),
+        ("test_signals.py",      "Signal Handling Tests"),
+         ("test_client.py",      "Client Integration Tests"),
+        ("test_integration.py",  "Full Integration Tests"),
     ]
+
     
     # Track results
     results = []

@@ -405,3 +405,51 @@ This server can be extended with:
 ## License
 
 This project is part of the camera service infrastructure.
+
+# TODO
+
+## Feature Implementation
+- Add media capture functionality:
+  - Implement `take_snapshot`, `start_recording`, `stop_recording`, and `schedule_recording` JSON-RPC methods.
+  - Integrate with `ffmpeg` or GStreamer (via subprocess) to capture and store snapshots/videos to the configured media directory.
+  - Generate accompanying metadata JSON files (timestamp, resolution, fps).
+
+## Camera Monitoring
+- Improve shutdown responsiveness in `CameraMonitor`:
+  - Replace `time.sleep` polling with an event or condition variable to ensure prompt thread exit.
+- Move capability detection off the main thread:
+  - Delegate `v4l2-ctl` calls to a thread‐ or process‐pool to avoid blocking monitoring loop.
+
+## API Validation & Error Handling
+- Add parameter schema validation for all JSON-RPC methods (e.g. using `pydantic` or manual checks).
+- Surface critical hardware errors as server health metrics or notifications.
+- Ensure JSON-RPC handler catches and logs all exceptions without masking persistent failures.
+
+## Testing
+- Provide `test_client.py` with full coverage:
+  - Unit tests for each JSON-RPC method (including invalid inputs).
+  - Integration test for camera-status notifications.
+- Add CI pipeline step to run tests automatically.
+
+## Configuration & Deployment
+- Support external configuration file (e.g. `config.json`) in addition to environment variables.
+- Handle log-directory permission errors gracefully (fallback to console only).
+- Add systemd service file and startup script to repository.
+
+## Packaging & Code Quality
+- Remove or consolidate redundant `__init__.py` imports to avoid circular dependencies.
+- Refine module structure to minimize relative imports and improve clarity.
+- Lint and format codebase (e.g. `flake8`, `black`).
+
+## Documentation
+- Update README to include new snapshot/recording API methods and example usage.
+- Document configuration options and deployment steps in a dedicated `docs/` folder.
+
+## Device Enumeration
+- Extend device discovery beyond `/dev/video0-9`:
+  - Automatically detect all V4L2 devices (`v4l2-ctl --list-devices`).
+  - Ignore non-camera video devices.
+
+## Logging & Observability
+- Leverage `StructuredLogger` consistently across modules.
+- Expose server health and metrics via a JSON-RPC or HTTP endpoint (e.g. Prometheus).
