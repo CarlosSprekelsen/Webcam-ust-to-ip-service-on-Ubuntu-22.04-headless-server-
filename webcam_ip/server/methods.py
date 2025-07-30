@@ -11,6 +11,10 @@ import platform
 import psutil
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+import subprocess
+import uuid
+from pathlib import Path
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +190,58 @@ async def get_camera_status(device: str) -> Dict[str, Any]:
         logger.error(f"Error getting camera status for {device}: {e}")
         raise RuntimeError(f"Failed to get camera status: {e}")
 
+async def capture_snapshot(device: str, format: str = "jpeg") -> Dict[str, Any]:
+    """
+    Capture a snapshot from the specified camera device.
+
+    Args:
+        device: Camera device path (e.g., "/dev/video0")
+        format: Image format (default: "jpeg")
+
+    Returns:
+        Dict containing snapshot metadata
+
+    Example:
+        Request:  {"jsonrpc": "2.0", "method": "capture_snapshot", "params": {"device": "/dev/video0"}, "id": 7}
+        Response: {"jsonrpc": "2.0", "result": {...}, "id": 7}
+    """
+    logger.info(f"Snapshot capture requested for device: {device} in format: {format}")
+
+    if not device or not device.startswith('/dev/video'):
+        raise ValueError(f"Invalid device path: {device}")
+
+    snapshot_id = str(uuid.uuid4())
+    filename = f"{snapshot_id}.{format}"
+    media_dir = Path("/opt/webcam-env/media")
+    media_dir.mkdir(parents=True, exist_ok=True)
+    filepath = media_dir / filename
+
+    cmd = [
+        "ffmpeg", "-f", "v4l2", "-i", device,
+        "-frames:v", "1", "-y", str(filepath)
+    ]
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            logger.error(f"ffmpeg error: {stderr.decode().strip()}")
+            raise RuntimeError(f"Snapshot capture failed: {stderr.decode().strip()}")
+    except Exception as e:
+        logger.error(f"Error capturing snapshot: {e}")
+        raise RuntimeError(f"Failed to capture snapshot: {e}")
+
+    return {
+        "snapshot_id": snapshot_id,
+        "filename": filename,
+        "device": device,
+        "timestamp": datetime.now().isoformat()
+    }
+
 # ============================================================================
 # Utility Methods
 # ============================================================================
@@ -228,6 +284,7 @@ async def get_supported_methods() -> List[str]:
         "get_server_info", 
         "get_camera_list",
         "get_camera_status",
+        "capture_snapshot",
         "echo",
         "get_supported_methods"
     ]
@@ -250,6 +307,7 @@ def register_all_methods(rpc_handler):
         ("get_server_info", get_server_info),
         ("get_camera_list", get_camera_list),
         ("get_camera_status", get_camera_status),
+        ("capture_snapshot", capture_snapshot),
         ("echo", echo),
         ("get_supported_methods", get_supported_methods),
     ]
@@ -291,6 +349,15 @@ METHOD_METADATA = {
         },
         "returns": "object",
         "example_request": {"jsonrpc": "2.0", "method": "get_camera_status", "params": {"device": "/dev/video0"}, "id": 4}
+    },
+    "capture_snapshot": {
+        "description": "Capture a snapshot from the specified camera device",
+        "parameters": {
+            "device": {"type": "string", "description": "Camera device path (e.g., '/dev/video0')", "required": True},
+            "format": {"type": "string", "description": "Image format (e.g., 'jpeg')", "required": False}
+        },
+        "returns": "object",
+        "example_request": {"jsonrpc": "2.0", "method": "capture_snapshot", "params": {"device": "/dev/video0"}, "id": 7}
     },
     "echo": {
         "description": "Echo back the provided message",

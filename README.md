@@ -225,7 +225,7 @@ The test suite includes:
 
 1. **Start the server:**
    ```bash
-   python3 server.py
+   python3 -m webcam_ip.server.websocket_serverpython3 -m webcam_ip.server.websocket_server
    ```
 
 2. **In another terminal, run the monitoring demo:**
