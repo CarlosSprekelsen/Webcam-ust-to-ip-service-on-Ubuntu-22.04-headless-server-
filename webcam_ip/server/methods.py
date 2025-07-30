@@ -15,6 +15,7 @@ import subprocess
 import uuid
 from pathlib import Path
 import asyncio
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -242,38 +243,43 @@ async def capture_snapshot(device: str, format: str = "jpeg") -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
-RECORDING_PROCESSES = {}
+GST_RECORDING_PROCESS = {"proc": None, "filename": None, "start_time": None}
 
-async def start_recording(device: str, format: str = "mp4", duration: Optional[int] = None) -> Dict[str, Any]:
+async def start_recording(device: str, filename: str, resolution: str = "640x480", duration: Optional[int] = None) -> dict:
     """
-    Start recording video from the specified camera device.
+    Start recording video from the device using GStreamer and save as MP4.
 
     Args:
         device: Camera device path (e.g., "/dev/video0")
-        format: Video format (default: "mp4")
+        filename: Output filename (e.g., "/opt/webcam-env/media/recording.mp4")
+        resolution: Video resolution (default: "640x480")
         duration: Optional duration in seconds
 
     Returns:
         Dict containing recording metadata
     """
-    logger.info(f"Start recording requested for device: {device} in format: {format}, duration: {duration}")
+    logger.info(f"Start recording requested for device: {device} to file: {filename} at resolution: {resolution}, duration: {duration}")
 
-    if not device or not device.startswith('/dev/video'):
-        raise ValueError(f"Invalid device path: {device}")
-
-    recording_id = str(uuid.uuid4())
-    filename = f"{recording_id}.{format}"
-    media_dir = Path("/opt/webcam-env/media")
-    media_dir.mkdir(parents=True, exist_ok=True)
-    filepath = media_dir / filename
+    if not device or not filename:
+        return {"error": "device and filename are required"}
+    if GST_RECORDING_PROCESS["proc"]:
+        return {"error": "A recording is already in progress"}
+    try:
+        width, height = map(int, resolution.split("x"))
+    except Exception:
+        return {"error": "Invalid resolution format. Use 'WIDTHxHEIGHT'."}
 
     cmd = [
-        "ffmpeg", "-f", "v4l2", "-i", device,
-        "-c:v", "libx264", "-preset", "ultrafast", "-y", str(filepath)
+        "gst-launch-1.0",
+        "v4l2src", f"device={device}",
+        "!", f"video/x-raw,width={width},height={height}",
+        "!", "x264enc",
+        "!", "mp4mux",
+        "!", "filesink", f"location={filename}"
     ]
     if duration:
-        cmd.insert(-2, "-t")
-        cmd.insert(-2, str(duration))
+        # Use 'timeout' to limit duration if available (Linux)
+        cmd = ["timeout", str(duration)] + cmd
 
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -281,47 +287,48 @@ async def start_recording(device: str, format: str = "mp4", duration: Optional[i
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        RECORDING_PROCESSES[recording_id] = proc
+        GST_RECORDING_PROCESS["proc"] = proc
+        GST_RECORDING_PROCESS["filename"] = filename
+        GST_RECORDING_PROCESS["start_time"] = datetime.now().isoformat()
+        return {
+            "filename": filename,
+            "device": device,
+            "resolution": resolution,
+            "started_at": GST_RECORDING_PROCESS["start_time"],
+            "duration": duration
+        }
     except Exception as e:
-        logger.error(f"Error starting recording: {e}")
-        raise RuntimeError(f"Failed to start recording: {e}")
+        logger.error(f"start_recording error: {e}")
+        return {"error": str(e)}
 
-    return {
-        "recording_id": recording_id,
-        "filename": filename,
-        "device": device,
-        "started_at": datetime.now().isoformat()
-    }
-
-async def stop_recording(recording_id: str) -> Dict[str, Any]:
+async def stop_recording() -> dict:
     """
-    Stop a running recording by its ID.
-
-    Args:
-        recording_id: The ID of the recording to stop
-
-    Returns:
-        Dict containing stop status
+    Stop any running GStreamer process started by start_recording.
     """
-    logger.info(f"Stop recording requested for recording_id: {recording_id}")
-
-    proc = RECORDING_PROCESSES.get(recording_id)
+    proc = GST_RECORDING_PROCESS.get("proc")
+    filename = GST_RECORDING_PROCESS.get("filename")
+    start_time = GST_RECORDING_PROCESS.get("start_time")
     if not proc:
-        raise ValueError(f"No active recording with id: {recording_id}")
-
+        return {"error": "No recording in progress"}
     try:
         proc.terminate()
         await proc.wait()
-        del RECORDING_PROCESSES[recording_id]
+        GST_RECORDING_PROCESS["proc"] = None
+        stop_time = datetime.now().isoformat()
+        # Optionally write metadata
+        meta = {
+            "filename": filename,
+            "started_at": start_time,
+            "stopped_at": stop_time
+        }
+        if filename:
+            meta_path = filename + ".json"
+            with open(meta_path, "w") as f:
+                json.dump(meta, f)
+        return {"status": "stopped", **meta}
     except Exception as e:
-        logger.error(f"Error stopping recording: {e}")
-        raise RuntimeError(f"Failed to stop recording: {e}")
-
-    return {
-        "recording_id": recording_id,
-        "status": "stopped",
-        "stopped_at": datetime.now().isoformat()
-    }
+        logger.error(f"stop_recording error: {e}")
+        return {"error": str(e)}
 
 async def schedule_recording(device: str, start_time: str, duration: int, format: str = "mp4") -> Dict[str, Any]:
     """

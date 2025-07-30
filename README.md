@@ -492,48 +492,54 @@ This server can be extended with:
 
 This project is part of the camera service infrastructure.
 
-# TODO
+## TODO (as of 2025-07-31)
 
-## Feature Implementation
-- Add media capture functionality:
-  - Audit `capture_snapshot`, `start_recording`, `stop_recording`, and `schedule_recording` JSON-RPC methods.
-  - Integrate with `ffmpeg` or GStreamer (via subprocess) to capture and store snapshots/videos to the configured media directory.
-  - Generate accompanying metadata JSON files (timestamp, resolution, fps).
+### 1. Media Capture Functionality
 
-## Camera Monitoring
-- Improve shutdown responsiveness in `CameraMonitor`:
-  - Replace `time.sleep` polling with an event or condition variable to ensure prompt thread exit.
-- Move capability detection off the main thread:
-  - Delegate `v4l2-ctl` calls to a thread- or process-pool to avoid blocking the monitoring loop.
+- [ ] **Implement JSON-RPC media methods:**
+    - [ ] `take_snapshot`: Capture a frame from the active camera and save to disk.
+    - [ ] `start_recording`: Begin video recording to file.
+    - [ ] `stop_recording`: Stop the current recording operation.
+    - [ ] `schedule_snapshots`: Capture periodic snapshots as scheduled.
+    - [ ] `schedule_recording`: Start/stop recording based on scheduled times.
+- [ ] Integrate with `ffmpeg` or GStreamer (via subprocess) for snapshot and recording.
+- [ ] Store resulting files in the configured media output directory (e.g., `/opt/media/`).
+- [ ] Generate and store a metadata `.json` file for each snapshot/recording (timestamp, resolution, FPS, etc.).
 
-## API Validation & Error Handling
-- Add parameter schema validation for all JSON-RPC methods (e.g. using `pydantic` or manual checks).
-- Surface critical hardware errors as server health metrics or notifications.
-- Ensure JSON-RPC handler catches and logs all exceptions without masking persistent failures.
+### 2. API Validation & Robustness
 
-## Testing
-- Provide `test_client.py` with full coverage:
-  - Unit tests for each JSON-RPC method (including invalid inputs).
-  - Integration test for camera-status notifications.
-- Expand existing pytest suite:
-  - Add `test_signals.py` to exercise `SignalHandler` and `GracefulShutdown`.
-  - Add `test_client.py` to the ordered list in `run_all_validation.py`.
-- Add CI pipeline step to run tests automatically.
+- [ ] Add parameter schema validation for all JSON-RPC methods (using Pydantic or manual validation).
+- [ ] Surface critical hardware errors as health notifications or status endpoints (not just in logs).
+- [ ] Ensure all persistent/hard failures are logged and surfaced to clients as needed.
 
-## Configuration & Deployment
-- **Config directory**: document and version the YAML/JSON files under `config/`:
-  - Define schema for `config/config.yaml` (or `config.json`): server host/port, camera poll interval, logging settings.
-  - Add a `03.Configuration.md` in `docs/` describing:
-    - All environment variables (names, defaults, purpose).
-    - How they map to entries in `config/config.yaml`.
-    - How to override via env vars or a custom file.
-- Handle log-directory permission errors gracefully (fallback to console only).
-- Add systemd unit file under `systemd/` and a startup script under `scripts/`, then document in `04.Deployment.md`.
-- Provide example commands to:
-  ```bash
-  # install deps
-  pip install -r requirements.txt
-  # run tests
-  python3 run_all_validation.py
-  # start service
-  python3 -m webcam_ip.websocket_server
+### 3. Testing
+
+- [ ] Expand `test_client.py` to cover all implemented API methods (including media and error cases).
+- [ ] Add/complete pytest suite:
+    - [ ] Add or expand tests for camera signal handling and graceful shutdown.
+    - [ ] Include `test_client.py` in the ordered suite (`run_all_validation.py`).
+- [ ] Integrate all tests into a CI pipeline (e.g., GitHub Actions, GitLab CI).
+
+### 4. Configuration & Deployment
+
+- [ ] Fully document the structure and schema of `config/config.yaml` (and/or `config.json`).
+- [ ] Create `docs/03.Configuration.md`:
+    - [ ] List all supported environment variables, defaults, and their mapping to config files.
+    - [ ] Explain how to override configuration via env vars or custom config files.
+- [ ] Ensure all configuration and log directory permission errors are gracefully handled (fallback to console logging if file logging fails).
+- [ ] Create or expand `docs/04.Deployment.md`:
+    - [ ] Document deployment, systemd service setup, startup scripts, and permission setup.
+
+### 5. Additional Enhancements (Future)
+
+- [ ] Add authentication and authorization for client connections.
+- [ ] Add support for WSS (WebSocket Secure) and TLS configuration.
+- [ ] Implement camera control methods (resolution/focus/zoom, if hardware supports).
+- [ ] Add metrics and health endpoints for monitoring/observability (Prometheus, etc.).
+- [ ] Support for additional camera types (e.g., IP cameras, MJPEG streams).
+
+---
+
+**Legend:**  
+- `[ ]` = Not started  
+- `[x]` = Completed (mark as you progress)

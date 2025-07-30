@@ -10,6 +10,7 @@ import asyncio
 import logging
 import threading
 import time
+import concurrent.futures
 from datetime import datetime
 from typing import Dict, Callable, Optional, List, Set, Any
 from dataclasses import dataclass
@@ -88,14 +89,17 @@ class CameraMonitor:
         }
         
         logger.info(f"Camera monitor initialized with config: {self.config}")
+        self._stop_event = threading.Event()
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)  # For capability detection
     
     def start_monitoring(self):
         """Start camera monitoring in a separate thread"""
         if self.monitoring:
             logger.warning("Camera monitoring already started")
             return
-        
+
         self.monitoring = True
+        self._stop_event.clear()  # Reset stop event
         self.stats["monitoring_started"] = datetime.now()
         
         # Start monitoring thread
@@ -116,43 +120,49 @@ class CameraMonitor:
         """Stop camera monitoring gracefully"""
         if not self.monitoring:
             return
-        
+
         logger.info("Stopping camera monitoring...")
         self.monitoring = False
-        
+        self._stop_event.set()  # Signal the thread to wake up and exit
+
         # Wait for monitor thread to finish
         if self.monitor_thread and self.monitor_thread.is_alive():
             self.monitor_thread.join(timeout=2.0)
             if self.monitor_thread.is_alive():
                 logger.warning("Monitor thread did not stop gracefully")
-        
+
+        # Shutdown the executor
+        self.executor.shutdown(wait=True)
+
         # Log final statistics
         duration = datetime.now() - self.stats["monitoring_started"]
         logger.info(f"Camera monitoring stopped after {duration.total_seconds():.1f}s")
         logger.info(f"Final stats: {self.stats}")
-    
+
     def _monitor_loop(self):
         """Main monitoring loop running in separate thread"""
         logger.info("Camera monitoring loop started")
-        
+
         while self.monitoring:
             try:
                 # Detect current cameras
                 current_cameras = self._detect_current_cameras()
-                
+
                 # Process changes with thread-safe locking
                 with self.lock:
                     self._process_camera_changes(current_cameras)
-                
-                # Sleep for poll interval
-                time.sleep(self.config.poll_interval)
-                
+
+                # Wait for poll interval or until stop event is set
+                if self._stop_event.wait(self.config.poll_interval):
+                    break  # Stop event set, exit promptly
+
             except Exception as e:
                 logger.error(f"Error in camera monitoring loop: {e}", exc_info=True)
                 self.stats["error_events"] += 1
-                # Continue monitoring after error with longer delay
-                time.sleep(1.0)
-        
+                # Wait for 1s or until stop event is set
+                if self._stop_event.wait(1.0):
+                    break
+
         logger.info("Camera monitoring loop stopped")
     
     def _detect_current_cameras(self) -> Dict[str, CameraInfo]:
@@ -184,19 +194,26 @@ class CameraMonitor:
         """Create CameraInfo for a device"""
         try:
             camera_info = CameraInfo(device=device, status=CameraStatus.CONNECTED)
-            
-            # Detect capabilities if enabled
+
+            # Detect capabilities if enabled, off the main thread
             if self.config.enable_capability_detection:
-                capabilities = self.detector.detect_capabilities(device)
+                # Submit detection to thread pool and wait for result
+                future = self.executor.submit(self.detector.detect_capabilities, device)
+                try:
+                    capabilities = future.result(timeout=self.config.detection_timeout + 1)
+                except Exception as e:
+                    logger.warning(f"Capability detection for {device} timed out or failed: {e}")
+                    capabilities = None
+
                 if capabilities:
                     camera_info.capabilities = capabilities
                     logger.debug(f"Detected capabilities for {device}: {capabilities.resolution} @ {capabilities.fps}fps")
                 else:
                     logger.warning(f"Could not detect capabilities for {device}")
-            
+
             camera_info.mark_connected(camera_info.capabilities)
             return camera_info
-            
+
         except Exception as e:
             logger.error(f"Error creating camera info for {device}: {e}")
             return None

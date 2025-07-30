@@ -134,6 +134,52 @@ def test_camera_registry():
         traceback.print_exc()
         return False
 
+def test_camera_status_enum():
+    """Test CameraStatus enum values"""
+    print("🔍 Testing CameraStatus Enum...")
+    try:
+        from webcam_ip.camera.models import CameraStatus
+        assert CameraStatus.CONNECTED.value == "CONNECTED"
+        assert CameraStatus.DISCONNECTED.value == "DISCONNECTED"
+        assert CameraStatus.ERROR.value == "ERROR"
+        assert CameraStatus.UNKNOWN.value == "UNKNOWN"
+        print("✅ CameraStatus Enum working correctly")
+        return True
+    except Exception as e:
+        print(f"❌ CameraStatus Enum test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def test_camera_event():
+    """Test CameraEvent dataclass"""
+    print("🔍 Testing CameraEvent...")
+    try:
+        from webcam_ip.camera.models import CameraEvent, CameraStatus, CameraCapabilities
+        event = CameraEvent(
+            device="/dev/video0",
+            event_type="connected",
+            old_status=CameraStatus.DISCONNECTED,
+            new_status=CameraStatus.CONNECTED,
+            capabilities=CameraCapabilities(resolution="1280x720", fps=25, formats=["YUYV"]),
+            error_message=None,
+            metadata={"note": "Test event"}
+        )
+        event_dict = event.to_dict()
+        assert event_dict["device"] == "/dev/video0"
+        assert event_dict["event_type"] == "connected"
+        assert event_dict["old_status"] == "DISCONNECTED"
+        assert event_dict["new_status"] == "CONNECTED"
+        assert "capabilities" in event_dict
+        assert event_dict["metadata"]["note"] == "Test event"
+        print("✅ CameraEvent working correctly")
+        return True
+    except Exception as e:
+        print(f"❌ CameraEvent test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def main():
     print("=" * 50)
     print("🔍 CAMERA MODELS VALIDATION TEST")
@@ -142,7 +188,9 @@ def main():
     tests = [
         test_camera_capabilities,
         test_camera_info,
-        test_camera_registry
+        test_camera_registry,
+        test_camera_status_enum,   
+        test_camera_event          
     ]
     
     passed = 0
