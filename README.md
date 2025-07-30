@@ -48,26 +48,66 @@ A Python service that provides a WebSocket endpoint with JSON-RPC 2.0 protocol s
 
 ## Usage
 
-### Starting the Server
+### Starting the Server (Production)
 
-**Method 1: Direct execution**
+Start the service with **systemd**:
+
 ```bash
-python3 server.py
+sudo systemctl start webcam-service
 ```
 
-**Method 2: As a module**
+The server will start and listen on `ws://0.0.0.0:8002/ws` by default.
+
+Check service status:
+
 ```bash
-python3 -m server
+sudo systemctl status webcam-service
 ```
 
-**Method 3: Using the start script**
+View live logs (recommended way to see output and monitor):
+
 ```bash
-./start_server.sh start
+sudo journalctl -u webcam-service -f
 ```
 
-The server will start and listen on `ws://0.0.0.0:8002/ws`.
+---
+
+### Stopping and Restarting the Server
+
+Stop the service:
+
+```bash
+sudo systemctl stop webcam-service
+```
+
+Restart the service:
+
+```bash
+sudo systemctl restart webcam-service
+```
+
+---
+
+### Legacy / Development (not for production)
+
+For **development or debugging only** (not for production), you may run the server directly:
+
+```bash
+python3 -m webcam_ip.server.websocket_server
+```
+
+Or, if using your virtualenv:
+
+```bash
+/opt/webcam-env/bin/python3 -m webcam_ip.server.websocket_server
+```
+
+---
 
 ### Expected Output
+
+You’ll see log output like:
+
 ```
 2025-07-30 10:00:00,000 - __main__ - INFO - Starting WebSocket JSON-RPC server on 0.0.0.0:8002/ws
 2025-07-30 10:00:00,001 - __main__ - INFO - Camera monitoring started
@@ -75,10 +115,31 @@ The server will start and listen on `ws://0.0.0.0:8002/ws`.
 2025-07-30 10:00:00,101 - __main__ - INFO - Server started successfully at ws://0.0.0.0:8002/ws
 ```
 
-### Stopping the Server
-- Press `Ctrl+C` for graceful shutdown
-- Send `SIGTERM` signal: `kill -TERM <pid>`
-- Use start script: `./start_server.sh stop`
+These log lines will appear in your system journal:
+
+```bash
+sudo journalctl -u webcam-service -f
+```
+
+Or (if configured) in `/opt/webcam-env/logs/server.log`.
+
+---
+
+### Service Management Summary
+
+| Task           | Command                                    |
+|----------------|--------------------------------------------|
+| Start          | `sudo systemctl start webcam-service`       |
+| Stop           | `sudo systemctl stop webcam-service`        |
+| Restart        | `sudo systemctl restart webcam-service`     |
+| Status         | `sudo systemctl status webcam-service`      |
+| View logs      | `sudo journalctl -u webcam-service -f`      |
+
+---
+
+**Note:**  
+All legacy start/stop scripts have been removed.  
+Production use is fully managed via `systemd` for reliability and maintainability.
 
 ## Camera Monitoring
 
