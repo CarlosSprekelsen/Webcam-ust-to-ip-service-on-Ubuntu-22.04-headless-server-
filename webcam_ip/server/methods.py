@@ -242,6 +242,126 @@ async def capture_snapshot(device: str, format: str = "jpeg") -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
+RECORDING_PROCESSES = {}
+
+async def start_recording(device: str, format: str = "mp4", duration: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Start recording video from the specified camera device.
+
+    Args:
+        device: Camera device path (e.g., "/dev/video0")
+        format: Video format (default: "mp4")
+        duration: Optional duration in seconds
+
+    Returns:
+        Dict containing recording metadata
+    """
+    logger.info(f"Start recording requested for device: {device} in format: {format}, duration: {duration}")
+
+    if not device or not device.startswith('/dev/video'):
+        raise ValueError(f"Invalid device path: {device}")
+
+    recording_id = str(uuid.uuid4())
+    filename = f"{recording_id}.{format}"
+    media_dir = Path("/opt/webcam-env/media")
+    media_dir.mkdir(parents=True, exist_ok=True)
+    filepath = media_dir / filename
+
+    cmd = [
+        "ffmpeg", "-f", "v4l2", "-i", device,
+        "-c:v", "libx264", "-preset", "ultrafast", "-y", str(filepath)
+    ]
+    if duration:
+        cmd.insert(-2, "-t")
+        cmd.insert(-2, str(duration))
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        RECORDING_PROCESSES[recording_id] = proc
+    except Exception as e:
+        logger.error(f"Error starting recording: {e}")
+        raise RuntimeError(f"Failed to start recording: {e}")
+
+    return {
+        "recording_id": recording_id,
+        "filename": filename,
+        "device": device,
+        "started_at": datetime.now().isoformat()
+    }
+
+async def stop_recording(recording_id: str) -> Dict[str, Any]:
+    """
+    Stop a running recording by its ID.
+
+    Args:
+        recording_id: The ID of the recording to stop
+
+    Returns:
+        Dict containing stop status
+    """
+    logger.info(f"Stop recording requested for recording_id: {recording_id}")
+
+    proc = RECORDING_PROCESSES.get(recording_id)
+    if not proc:
+        raise ValueError(f"No active recording with id: {recording_id}")
+
+    try:
+        proc.terminate()
+        await proc.wait()
+        del RECORDING_PROCESSES[recording_id]
+    except Exception as e:
+        logger.error(f"Error stopping recording: {e}")
+        raise RuntimeError(f"Failed to stop recording: {e}")
+
+    return {
+        "recording_id": recording_id,
+        "status": "stopped",
+        "stopped_at": datetime.now().isoformat()
+    }
+
+async def schedule_recording(device: str, start_time: str, duration: int, format: str = "mp4") -> Dict[str, Any]:
+    """
+    Schedule a recording at a future time.
+
+    Args:
+        device: Camera device path (e.g., "/dev/video0")
+        start_time: ISO8601 string for when to start recording
+        duration: Duration in seconds
+        format: Video format (default: "mp4")
+
+    Returns:
+        Dict containing schedule metadata
+    """
+    logger.info(f"Schedule recording requested for device: {device} at {start_time} for {duration}s in format: {format}")
+
+    try:
+        start_dt = datetime.fromisoformat(start_time)
+    except Exception as e:
+        raise ValueError(f"Invalid start_time format: {e}")
+
+    now = datetime.now()
+    delay = (start_dt - now).total_seconds()
+    if delay < 0:
+        raise ValueError("start_time must be in the future")
+
+    async def delayed_record():
+        await asyncio.sleep(delay)
+        await start_recording(device, format=format, duration=duration)
+
+    asyncio.create_task(delayed_record())
+
+    return {
+        "device": device,
+        "scheduled_for": start_time,
+        "duration": duration,
+        "format": format,
+        "status": "scheduled"
+    }
+
 # ============================================================================
 # Utility Methods
 # ============================================================================
@@ -285,6 +405,9 @@ async def get_supported_methods() -> List[str]:
         "get_camera_list",
         "get_camera_status",
         "capture_snapshot",
+        "start_recording",
+        "stop_recording",
+        "schedule_recording",
         "echo",
         "get_supported_methods"
     ]
@@ -308,6 +431,9 @@ def register_all_methods(rpc_handler):
         ("get_camera_list", get_camera_list),
         ("get_camera_status", get_camera_status),
         ("capture_snapshot", capture_snapshot),
+        ("start_recording", start_recording),
+        ("stop_recording", stop_recording),
+        ("schedule_recording", schedule_recording),
         ("echo", echo),
         ("get_supported_methods", get_supported_methods),
     ]
@@ -358,6 +484,44 @@ METHOD_METADATA = {
         },
         "returns": "object",
         "example_request": {"jsonrpc": "2.0", "method": "capture_snapshot", "params": {"device": "/dev/video0"}, "id": 7}
+    },
+    "start_recording": {
+        "description": "Start recording video from the specified camera device",
+        "parameters": {
+            "device": {"type": "string", "description": "Camera device path (e.g., '/dev/video0')", "required": True},
+            "format": {"type": "string", "description": "Video format (e.g., 'mp4')", "required": False},
+            "duration": {"type": "integer", "description": "Duration in seconds", "required": False}
+        },
+        "returns": "object",
+        "example_request": {"jsonrpc": "2.0", "method": "start_recording", "params": {"device": "/dev/video0"}, "id": 8}
+    },
+    "stop_recording": {
+        "description": "Stop a running recording by its ID",
+        "parameters": {
+            "recording_id": {"type": "string", "description": "The ID of the recording to stop", "required": True}
+        },
+        "returns": "object",
+        "example_request": {"jsonrpc": "2.0", "method": "stop_recording", "params": {"recording_id": "uuid"}, "id": 9}
+    },
+    "schedule_recording": {
+        "description": "Schedule a recording at a future time",
+        "parameters": {
+            "device": {"type": "string", "description": "Camera device path (e.g., '/dev/video0')", "required": True},
+            "start_time": {"type": "string", "description": "ISO8601 string for when to start recording", "required": True},
+            "duration": {"type": "integer", "description": "Duration in seconds", "required": True},
+            "format": {"type": "string", "description": "Video format (e.g., 'mp4')", "required": False}
+        },
+        "returns": "object",
+        "example_request": {
+            "jsonrpc": "2.0",
+            "method": "schedule_recording",
+            "params": {
+                "device": "/dev/video0",
+                "start_time": "2025-07-30T15:00:00",
+                "duration": 60
+            },
+            "id": 10
+        }
     },
     "echo": {
         "description": "Echo back the provided message",

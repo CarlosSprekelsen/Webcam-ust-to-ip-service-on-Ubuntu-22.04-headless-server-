@@ -496,7 +496,7 @@ This project is part of the camera service infrastructure.
 
 ## Feature Implementation
 - Add media capture functionality:
-  - Implement `take_snapshot`, `start_recording`, `stop_recording`, and `schedule_recording` JSON-RPC methods.
+  - Audit `capture_snapshot`, `start_recording`, `stop_recording`, and `schedule_recording` JSON-RPC methods.
   - Integrate with `ffmpeg` or GStreamer (via subprocess) to capture and store snapshots/videos to the configured media directory.
   - Generate accompanying metadata JSON files (timestamp, resolution, fps).
 
