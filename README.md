@@ -48,66 +48,26 @@ A Python service that provides a WebSocket endpoint with JSON-RPC 2.0 protocol s
 
 ## Usage
 
-### Starting the Server (Production)
+### Starting the Server
 
-Start the service with **systemd**:
-
+**Method 1: Direct execution**
 ```bash
-sudo systemctl start webcam-service
+python3 server.py
 ```
 
-The server will start and listen on `ws://0.0.0.0:8002/ws` by default.
-
-Check service status:
-
+**Method 2: As a module**
 ```bash
-sudo systemctl status webcam-service
+python3 -m server
 ```
 
-View live logs (recommended way to see output and monitor):
-
+**Method 3: Using the start script**
 ```bash
-sudo journalctl -u webcam-service -f
+./start_server.sh start
 ```
 
----
-
-### Stopping and Restarting the Server
-
-Stop the service:
-
-```bash
-sudo systemctl stop webcam-service
-```
-
-Restart the service:
-
-```bash
-sudo systemctl restart webcam-service
-```
-
----
-
-### Legacy / Development (not for production)
-
-For **development or debugging only** (not for production), you may run the server directly:
-
-```bash
-python3 -m webcam_ip.server.websocket_server
-```
-
-Or, if using your virtualenv:
-
-```bash
-/opt/webcam-env/bin/python3 -m webcam_ip.server.websocket_server
-```
-
----
+The server will start and listen on `ws://0.0.0.0:8002/ws`.
 
 ### Expected Output
-
-You’ll see log output like:
-
 ```
 2025-07-30 10:00:00,000 - __main__ - INFO - Starting WebSocket JSON-RPC server on 0.0.0.0:8002/ws
 2025-07-30 10:00:00,001 - __main__ - INFO - Camera monitoring started
@@ -115,31 +75,10 @@ You’ll see log output like:
 2025-07-30 10:00:00,101 - __main__ - INFO - Server started successfully at ws://0.0.0.0:8002/ws
 ```
 
-These log lines will appear in your system journal:
-
-```bash
-sudo journalctl -u webcam-service -f
-```
-
-Or (if configured) in `/opt/webcam-env/logs/server.log`.
-
----
-
-### Service Management Summary
-
-| Task           | Command                                    |
-|----------------|--------------------------------------------|
-| Start          | `sudo systemctl start webcam-service`       |
-| Stop           | `sudo systemctl stop webcam-service`        |
-| Restart        | `sudo systemctl restart webcam-service`     |
-| Status         | `sudo systemctl status webcam-service`      |
-| View logs      | `sudo journalctl -u webcam-service -f`      |
-
----
-
-**Note:**  
-All legacy start/stop scripts have been removed.  
-Production use is fully managed via `systemd` for reliability and maintainability.
+### Stopping the Server
+- Press `Ctrl+C` for graceful shutdown
+- Send `SIGTERM` signal: `kill -TERM <pid>`
+- Use start script: `./start_server.sh stop`
 
 ## Camera Monitoring
 
@@ -225,7 +164,7 @@ The test suite includes:
 
 1. **Start the server:**
    ```bash
-   python3 -m webcam_ip.server.websocket_serverpython3 -m webcam_ip.server.websocket_server
+   python3 server.py
    ```
 
 2. **In another terminal, run the monitoring demo:**
@@ -530,7 +469,18 @@ This project is part of the camera service infrastructure.
 - [ ] Create or expand `docs/04.Deployment.md`:
     - [ ] Document deployment, systemd service setup, startup scripts, and permission setup.
 
-### 5. Additional Enhancements (Future)
+### 6. Documentation
+- [ ] Update README to include:
+  - [ ] New snapshot/recording API methods and example usage (refer to docs-API.md).
+  - [ ] Environment variables table (host, port, poll interval, log settings).
+  - [ ] Quickstart “clone → install → test → run” commands.
+- [ ] - Create a `docs/` folder with:
+  - [ ] - `05.Validation.md` updated to list all test files (`validate_config.py`, `test_imports.py`, `test_jsonrpc.py`, `test_camera_models.py`, `test_logging.py`, `test_signals.py`, `test_client.py`, `test_integration.py`) in the proper order.
+  - [ ] - `06.ClientDemo.md` (or include in README) with a minimal `client_demo.py` example and usage instructions.
+- [ ] Align README.md with implemented features based on actual code.
+- [ ] Simplify README.md  and refer to complete docs under docs folder
+
+### 6. Additional Enhancements (Future)
 
 - [ ] Add authentication and authorization for client connections.
 - [ ] Add support for WSS (WebSocket Secure) and TLS configuration.
@@ -543,3 +493,32 @@ This project is part of the camera service infrastructure.
 **Legend:**  
 - `[ ]` = Not started  
 - `[x]` = Completed (mark as you progress)
+
+--- OLDER TODO, to merge or update if already done.
+
+## API Validation & Error Handling
+- Add parameter schema validation for all JSON-RPC methods (e.g. using `pydantic` or manual checks).
+- Surface critical hardware errors as server health metrics or notifications.
+- Ensure JSON-RPC handler catches and logs all exceptions without masking persistent failures.
+
+## Testing
+- Add CI pipeline step to run tests automatically.
+
+## Configuration & Deployment
+- Support external configuration file (e.g. `config.json`) in addition to environment variables.
+- Handle log-directory permission errors gracefully (fallback to console only).
+- Add systemd service file and startup script to repository.
+
+## Packaging & Code Quality
+- Remove or consolidate redundant `__init__.py` imports to avoid circular dependencies.
+- Refine module structure to minimize relative imports and improve clarity.
+- Lint and format codebase (e.g. `flake8`, `black`).
+
+## Device Enumeration
+- Extend device discovery beyond `/dev/video0-9`:
+  - Automatically detect all V4L2 devices (`v4l2-ctl --list-devices`).
+  - Ignore non-camera video devices.
+
+## Logging & Observability
+- Leverage `StructuredLogger` consistently across modules.
+- Expose server health and metrics via a JSON-RPC or HTTP endpoint (e.g. Prometheus).
