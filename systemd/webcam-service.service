@@ -1,6 +1,6 @@
 [Unit]
 Description=WebSocket JSON-RPC 2.0 Server
-Documentation=file:///opt/webcam-env/skeleton-server/README.md
+Documentation=file:///opt/webcam-env/webcam_ip/README.md
 After=network.target
 Wants=network.target
 
@@ -10,7 +10,7 @@ User=www-data
 Group=www-data
 
 # Working directory
-WorkingDirectory=/opt/webcam-env/skeleton-server
+WorkingDirectory=/opt/webcam-env/webcam_ip
 
 # Python executable and script
 ExecStart=/opt/webcam-env/bin/python3 -m webcam_ip.server.websocket_server
@@ -22,7 +22,7 @@ StartLimitInterval=60
 StartLimitBurst=3
 
 # Environment variables
-Environment=PYTHONPATH=/opt/webcam-env/skeleton-server
+Environment=PYTHONPATH=/opt/webcam-env/webcam_ip
 Environment=PYTHONUNBUFFERED=1
 
 # Security settings

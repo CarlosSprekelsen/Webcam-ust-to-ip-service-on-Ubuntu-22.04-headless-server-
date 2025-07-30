@@ -5,7 +5,7 @@ set -e
 
 # Configuration
 VENV_PATH="/opt/webcam-env"
-SERVER_DIR="${VENV_PATH}/skeleton-server"
+SERVER_DIR="${VENV_PATH}/webcam_ip"
 PYTHON_EXEC="${VENV_PATH}/bin/python3"
 SERVER_SCRIPT="-m webcam_ip.server.websocket_server"
 LOG_DIR="${VENV_PATH}/logs"

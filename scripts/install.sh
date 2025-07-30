@@ -5,7 +5,7 @@ set -e
 
 # Configuration
 VENV_PATH="/opt/webcam-env"
-SERVER_DIR="${VENV_PATH}/skeleton-server"
+SERVER_DIR="${VENV_PATH}/webcam_ip"
 SERVICE_NAME="websocket-jsonrpc"
 
 # Colors for output

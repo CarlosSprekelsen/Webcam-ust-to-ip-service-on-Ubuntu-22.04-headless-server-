@@ -8,12 +8,12 @@ import os
 
 # Read README for long description
 def read_readme():
-    with open(os.path.join(os.path.dirname(__file__), 'skeleton-server', 'README.md'), 'r') as f:
+    with open(os.path.join(os.path.dirname(__file__), 'webcam_ip', 'README.md'), 'r') as f:
         return f.read()
 
 # Read requirements
 def read_requirements():
-    with open(os.path.join(os.path.dirname(__file__), 'skeleton-server', 'requirements.txt'), 'r') as f:
+    with open(os.path.join(os.path.dirname(__file__), 'webcam_ip', 'requirements.txt'), 'r') as f:
         return [line.strip() for line in f if line.strip() and not line.startswith('#')]
 
 setup(
@@ -25,7 +25,7 @@ setup(
     author="Camera Service Team",
     python_requires=">=3.10",
     packages=find_packages(),
-    package_dir={"": "skeleton-server"},
+    package_dir={"": "webcam_ip"},
     install_requires=read_requirements(),
     extras_require={
         "dev": [
