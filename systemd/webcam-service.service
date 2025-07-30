@@ -13,7 +13,7 @@ Group=www-data
 WorkingDirectory=/opt/webcam-env/skeleton-server
 
 # Python executable and script
-ExecStart=/opt/webcam-env/bin/python3 /opt/webcam-env/skeleton-server/server.py
+ExecStart=/opt/webcam-env/bin/python3 -m webcam_ip.server.websocket_server
 
 # Restart policy
 Restart=always

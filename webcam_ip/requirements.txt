@@ -8,6 +8,9 @@ jsonrpcserver>=5.0.9
 # High-performance event loop
 uvloop>=0.17.0
 
+psutil>=5.9.0          # For system info in server methods
+pyudev>=0.24.0         # Optional: for event-driven camera monitoring
+
 # Camera monitoring dependencies
 # Note: v4l-utils package must be installed system-wide for v4l2-ctl command
 # Ubuntu/Debian: sudo apt-get install v4l-utils
