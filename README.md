@@ -48,37 +48,40 @@ A Python service that provides a WebSocket endpoint with JSON-RPC 2.0 protocol s
 
 ## Usage
 
-### Starting the Server
+### Starting the Server (systemd)
 
-**Method 1: Direct execution**
-```bash
-python3 server.py
-```
+The recommended way to run the server is via systemd:
 
-**Method 2: As a module**
-```bash
-python3 -m server
-```
+1. **Copy the systemd service file:**
+   ```bash
+   sudo cp systemd/webcam-service.service /etc/systemd/system/webcam-service.service
+   ```
 
-**Method 3: Using the start script**
-```bash
-./start_server.sh start
-```
+2. **Reload systemd and enable the service:**
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable webcam-service
+   sudo systemctl start webcam-service
+   ```
+
+3. **Check status:**
+   ```bash
+   sudo systemctl status webcam-service
+   ```
 
 The server will start and listen on `ws://0.0.0.0:8002/ws`.
 
-### Expected Output
-```
-2025-07-30 10:00:00,000 - __main__ - INFO - Starting WebSocket JSON-RPC server on 0.0.0.0:8002/ws
-2025-07-30 10:00:00,001 - __main__ - INFO - Camera monitoring started
-2025-07-30 10:00:00,100 - __main__ - INFO - Initial camera status: /dev/video0 - CONNECTED
-2025-07-30 10:00:00,101 - __main__ - INFO - Server started successfully at ws://0.0.0.0:8002/ws
-```
-
 ### Stopping the Server
-- Press `Ctrl+C` for graceful shutdown
-- Send `SIGTERM` signal: `kill -TERM <pid>`
-- Use start script: `./start_server.sh stop`
+
+- To stop the service:
+  ```bash
+  sudo systemctl stop webcam-service
+  ```
+
+- To disable on boot:
+  ```bash
+  sudo systemctl disable webcam-service
+  ```
 
 ## Camera Monitoring
 
@@ -126,17 +129,17 @@ The server automatically monitors USB camera devices and sends JSON-RPC notifica
 
 **Simple ping test:**
 ```bash
-python3 test_client.py --simple
+python3 -m webcam_ip.test_client --simple
 ```
 
 **Camera monitoring demo:**
 ```bash
-python3 test_client.py --monitor --duration 30
+python3 -m webcam_ip.test_client --monitor --duration 30
 ```
 
 ### Full Test Suite
 ```bash
-python3 test_client.py
+python3 -m webcam_ip.test_client
 ```
 
 The test suite includes:
@@ -164,12 +167,12 @@ The test suite includes:
 
 1. **Start the server:**
    ```bash
-   python3 server.py
+   sudo systemctl start webcam-service
    ```
 
 2. **In another terminal, run the monitoring demo:**
    ```bash
-   python3 test_client.py --monitor --duration 60
+   python3 -m webcam_ip.test_client --monitor --duration 60
    ```
 
 3. **Physically plug/unplug a USB webcam** and observe real-time notifications
@@ -213,25 +216,32 @@ When you connect to the WebSocket, you'll automatically receive camera status no
   Response: {"jsonrpc": "2.0", "result": "pong", "id": 1}
   ```
 
-### Notifications
+#### `get_server_info`
+- **Description**: Get comprehensive server information
+- **Parameters**: None
+- **Returns**: Object with server, system, and resource info
 
-#### `camera_status_update`
-- **Description**: Automatic notification sent when camera status changes
-- **Type**: JSON-RPC 2.0 Notification (no response expected)
+#### `get_camera_list`
+- **Description**: Get list of currently connected cameras
+- **Parameters**: None
+- **Returns**: Object with camera list, total, connected, and timestamp
+
+#### `get_camera_status`
+- **Description**: Get detailed status for a specific camera device
 - **Parameters**:
-  - `status`: `"CONNECTED"` or `"DISCONNECTED"`
-  - `device`: Device path (e.g., `"/dev/video0"`)
-  - `resolution`: Camera resolution (only when CONNECTED, e.g., `"640x480"`)
-  - `fps`: Camera frame rate (only when CONNECTED, e.g., `30`)
+  - `device`: string (e.g., "/dev/video0") **required**
+- **Returns**: Object with detailed camera status
 
-### Error Codes
+#### `echo`
+- **Description**: Echo back the provided message
+- **Parameters**:
+  - `message`: string **required**
+- **Returns**: The same message
 
-The server implements standard JSON-RPC 2.0 error codes:
-
-- **-32700**: Parse error (Invalid JSON)
-- **-32600**: Invalid Request (Missing required fields)
-- **-32601**: Method not found
-- **-32603**: Internal error
+#### `get_supported_methods`
+- **Description**: Get list of all supported RPC methods
+- **Parameters**: None
+- **Returns**: Array of method names
 
 ## Logging
 
@@ -287,8 +297,7 @@ webcam-service/
 │   ├── config.yaml              # Default configuration
 │   └── logging.yaml             # Logging configuration
 ├── scripts/
-│   ├── install.sh
-│   └── start_server.sh
+│   └── install.sh
 ├── systemd/
 │   └── webcam-service.service
 ├── setup.py
@@ -303,7 +312,7 @@ webcam-service/
 - **CameraMonitor**: Real-time USB camera monitoring with threading
 - **CameraInfo**: Data structure for camera information
 - **JSON-RPC Handler**: Processes JSON-RPC 2.0 requests and responses
-- **Method Registry**: Currently supports the `ping` method
+- **Method Registry**: Supports all documented methods
 - **Connection Manager**: Tracks connected clients and broadcasts notifications
 - **Logger**: Comprehensive logging system
 
@@ -381,10 +390,7 @@ webcam-service/
    ```
 
 ### Debug Mode
-To enable debug logging, modify the logging level in `server.py`:
-```python
-logging.basicConfig(level=logging.DEBUG, ...)
-```
+To enable debug logging, modify the logging level in your configuration or set it in your environment.
 
 ### Camera Debugging
 ```bash
@@ -431,95 +437,137 @@ This server can be extended with:
 
 This project is part of the camera service infrastructure.
 
-## TODO (as of 2025-07-31)
+# TODO
 
-### 1. Media Capture Functionality
+## Priority 1: Critical Documentation & Testing Alignment
 
-- [ ] **Implement JSON-RPC media methods:**
-    - [ ] `take_snapshot`: Capture a frame from the active camera and save to disk.
-    - [ ] `start_recording`: Begin video recording to file.
-    - [ ] `stop_recording`: Stop the current recording operation.
-    - [ ] `schedule_snapshots`: Capture periodic snapshots as scheduled.
-    - [ ] `schedule_recording`: Start/stop recording based on scheduled times.
-- [ ] Integrate with `GStreamer` (via subprocess) for snapshot and recording.
-- [ ] Revise installation docs and dependences from `GStreamer` package.
-- [ ] Store resulting files in the configured media output directory (e.g., `/opt/media/`).
-- [ ] Generate and store a metadata `.json` file for each snapshot/recording (timestamp, resolution, FPS, etc.).
+### Documentation Reconciliation
+- [ ] Update README.md to match current implementation:
+  - [ ] Fix all references from `server.py` to `python -m webcam_ip.server.websocket_server`
+  - [ ] Update systemd service name consistency (webcam-service vs websocket-jsonrpc)
+  - [ ] Document actual implemented JSON-RPC methods with correct parameters
+  - [ ] Remove references to non-existent `start_server.sh` and legacy scripts
+- [ ] Create `docs/API.md` with complete method documentation:
+  - [ ] `ping` - implemented
+  - [ ] `get_server_info` - implemented 
+  - [ ] `get_camera_list` - implemented
+  - [ ] `get_camera_status` - implemented with device parameter
+  - [ ] `echo` - implemented with message parameter
+  - [ ] `get_supported_methods` - implemented
 
-### 2. API Validation & Robustness
+### Test Suite Completion
+- [ ] Fix `run_all_validation.py` to include all test files in correct order
+- [ ] Complete `test_client.py` implementation (currently missing WebSocket client tests)
+- [ ] Add `test_signals.py` to validation suite
+- [ ] Create integration tests for camera hot-plug scenarios
+- [ ] Add test coverage reporting
 
-- [ ] Add parameter schema validation for all JSON-RPC methods (using Pydantic or manual validation).
-- [ ] Surface critical hardware errors as health notifications or status endpoints (not just in logs).
-- [ ] Ensure all persistent/hard failures are logged and surfaced to clients as needed.
+## Priority 2: Configuration System
 
-### 3. Testing
+### Configuration Implementation
+- [ ] Complete `webcam_ip/config.py` to actually load from `config/config.yaml`
+- [ ] Implement environment variable overrides for all settings
+- [ ] Add configuration validation with meaningful error messages
+- [ ] Create `docs/03.Configuration.md` documenting:
+  - [ ] All configuration options and defaults
+  - [ ] Environment variable mappings
+  - [ ] Example configurations
 
-- [ ] Expand `test_client.py` to cover all implemented API methods (including media and error cases).
-- [ ] Add/complete pytest suite:
-    - [ ] Add or expand tests for camera signal handling and graceful shutdown.
-    - [ ] Include `test_client.py` in the ordered suite (`run_all_validation.py`).
-- [ ] Integrate all tests into a CI pipeline (e.g., GitHub Actions, GitLab CI).
+### Missing Configuration Features
+- [ ] Media output directory configuration
+- [ ] GStreamer/FFmpeg backend selection
+- [ ] Camera device range configuration
+- [ ] WebSocket connection limits
 
-### 4. Configuration & Deployment
+## Priority 3: Core Functionality Gaps
 
-- [ ] Fully document the structure and schema of `config/config.yaml` (and/or `config.json`).
-- [ ] Create `docs/03.Configuration.md`:
-    - [ ] List all supported environment variables, defaults, and their mapping to config files.
-    - [ ] Explain how to override configuration via env vars or custom config files.
-- [ ] Ensure all configuration and log directory permission errors are gracefully handled (fallback to console logging if file logging fails).
-- [ ] Create or expand `docs/04.Deployment.md`:
-    - [ ] Document deployment, systemd service setup, startup scripts, and permission setup.
+### Error Handling & Validation
+- [ ] Add parameter validation for all JSON-RPC methods
+- [ ] Implement proper error responses for invalid camera devices
+- [ ] Add connection rate limiting
+- [ ] Handle v4l2-utils missing gracefully with clear error messages
 
-### 6. Documentation
-- [ ] Update README to include:
-  - [ ] New snapshot/recording API methods and example usage (refer to docs-API.md).
-  - [ ] Environment variables table (host, port, poll interval, log settings).
-  - [ ] Quickstart “clone → install → test → run” commands.
-- [ ] - Create a `docs/` folder with:
-  - [ ] - `05.Validation.md` updated to list all test files (`validate_config.py`, `test_imports.py`, `test_jsonrpc.py`, `test_camera_models.py`, `test_logging.py`, `test_signals.py`, `test_client.py`, `test_integration.py`) in the proper order.
-  - [ ] - `06.ClientDemo.md` (or include in README) with a minimal `client_demo.py` example and usage instructions.
-- [ ] Align README.md with implemented features based on actual code.
-- [ ] Simplify README.md  and refer to complete docs under docs folder
+### Installation & Deployment
+- [ ] Update `requirements.txt` location (currently in wrong directory)
+- [ ] Fix `setup.py` to work with current module structure
+- [ ] Update `scripts/install.sh` for GStreamer dependencies
+- [ ] Create `docs/04.Deployment.md` with production deployment guide
 
-### 6. Additional Enhancements (Future)
+## Priority 4: Media Capture Features
 
-- [ ] Add authentication and authorization for client connections.
-- [ ] Add support for WSS (WebSocket Secure) and TLS configuration.
-- [ ] Implement camera control methods (resolution/focus/zoom, if hardware supports).
-- [ ] Add metrics and health endpoints for monitoring/observability (Prometheus, etc.).
-- [ ] Support for additional camera types (e.g., IP cameras, MJPEG streams).
+### Snapshot Functionality
+- [ ] Implement `capture_snapshot` JSON-RPC method:
+  - [ ] Parameters: device, format (jpeg/png), quality
+  - [ ] Return: snapshot_id, file_path, metadata
+- [ ] Create media storage directory management
+- [ ] Generate metadata JSON for each capture
+
+### Video Recording
+- [ ] Implement `start_recording` method:
+  - [ ] Parameters: device, format, duration (optional)
+  - [ ] Return: recording_id, status
+- [ ] Implement `stop_recording` method:
+  - [ ] Parameters: recording_id
+  - [ ] Return: file_path, duration, metadata
+- [ ] Add recording status to camera info
+
+### Scheduled Operations
+- [ ] Implement `schedule_snapshot` for periodic captures
+- [ ] Implement `schedule_recording` for timed recordings
+- [ ] Add schedule management methods (list, cancel)
+
+## Priority 5: Production Readiness
+
+### Performance Optimization
+- [ ] Move v4l2-ctl calls to thread pool (currently blocks monitor thread)
+- [ ] Implement proper capability caching with TTL
+- [ ] Add connection pooling for multiple clients
+- [ ] Optimize camera polling vs event-driven monitoring
+
+### Monitoring & Observability
+- [ ] Add health check endpoint
+- [ ] Implement Prometheus metrics:
+  - [ ] WebSocket connections
+  - [ ] Camera status changes
+  - [ ] Method call latency
+  - [ ] Error rates
+- [ ] Add structured logging with request IDs
+
+### Security
+- [ ] Add WebSocket authentication (JWT/API key)
+- [ ] Implement rate limiting per client
+- [ ] Add input sanitization for device paths
+- [ ] Support WSS (WebSocket Secure)
+
+## Priority 6: Future Enhancements
+
+### Extended Camera Support
+- [ ] Support IP cameras (RTSP/HTTP streams)
+- [ ] Add camera control methods (if hardware supports):
+  - [ ] Set resolution
+  - [ ] Adjust exposure/brightness
+  - [ ] Pan/tilt/zoom for PTZ cameras
+- [ ] Multiple simultaneous camera streams
+
+### Advanced Features
+- [ ] Motion detection triggers
+- [ ] Video analytics integration
+- [ ] Cloud storage integration
+- [ ] Multi-server federation
+
+## Completed Items ✓
+- [x] Basic WebSocket server with JSON-RPC 2.0
+- [x] Camera monitoring with connect/disconnect detection
+- [x] Capability detection using v4l2-ctl
+- [x] Structured logging system
+- [x] Signal handling for graceful shutdown
+- [x] Basic test structure
+- [x] Module refactoring into server/camera/utils
 
 ---
 
-**Legend:**  
-- `[ ]` = Not started  
-- `[x]` = Completed (mark as you progress)
-
---- OLDER TODO, to merge or update if already done.
-
-## API Validation & Error Handling
-- Add parameter schema validation for all JSON-RPC methods (e.g. using `pydantic` or manual checks).
-- Surface critical hardware errors as server health metrics or notifications.
-- Ensure JSON-RPC handler catches and logs all exceptions without masking persistent failures.
-
-## Testing
-- Add CI pipeline step to run tests automatically.
-
-## Configuration & Deployment
-- Support external configuration file (e.g. `config.json`) in addition to environment variables.
-- Handle log-directory permission errors gracefully (fallback to console only).
-- Add systemd service file and startup script to repository.
-
-## Packaging & Code Quality
-- Remove or consolidate redundant `__init__.py` imports to avoid circular dependencies.
-- Refine module structure to minimize relative imports and improve clarity.
-- Lint and format codebase (e.g. `flake8`, `black`).
-
-## Device Enumeration
-- Extend device discovery beyond `/dev/video0-9`:
-  - Automatically detect all V4L2 devices (`v4l2-ctl --list-devices`).
-  - Ignore non-camera video devices.
-
-## Logging & Observability
-- Leverage `StructuredLogger` consistently across modules.
-- Expose server health and metrics via a JSON-RPC or HTTP endpoint (e.g. Prometheus).
+**Next Steps:**
+1. Start with Priority 1 items to align documentation with code
+2. Run `python run_all_validation.py` to identify failing tests
+3. Update configuration system before adding new features
+4. Implement media capture only after tests are passing
